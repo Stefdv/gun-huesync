@@ -1,0 +1,60 @@
+{
+  "_args": [
+    [
+      "gun-huesync@2.0.3",
+      "d:\\02 GunUi Library"
+    ]
+  ],
+  "_from": "gun-huesync@^2.0.4",
+  "_id": "gun-huesync@2.0.4",
+  "_inBundle": false,
+  "_integrity": "sha512-btnSv7Q/CBzL7bHc7oT3UebdRbwyOPTQX9xPWMEmq4N3hS5BepZupsljQzAIcfICREwRpoEsO97EKBi7+kSR5w==",
+  "_location": "/gun-huesync",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "gun-huesync@^2.0.4",
+    "name": "gun-huesync",
+    "escapedName": "gun-huesync",
+    "rawSpec": "^2.0.4",
+    "saveSpec": null,
+    "fetchSpec": "^2.0.4"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/gun-huesync/-/gun-huesync-2.0.4.tgz",
+  "_shasum": "40f6ca61550a5c7b45e59587d08acaadef068ac8",
+  "_spec": "gun-huesync@^2.0.4",
+  "_where": "d:\\05 GunUi HUE Library",
+  "author": {
+    "name": "S.J.J. de Vries",
+    "url": " Stefdv2@hotmail.com"
+  },
+  "bugs": {
+    "url": "https://github.com/Stefdv/gun-huesync/issues"
+  },
+  "bundleDependencies": false,
+  "deprecated": false,
+  "description": "Add tagging capabilities to gun!",
+  "homepage": "https://github.com/Stefdv/gun-huesync#readme",
+  "keywords": [
+    "gun",
+    "tag",
+    "tagging",
+    "tagger"
+  ],
+  "license": "(ZLIB | MIT | Apache-2.0)",
+  "main": "gun-huesync.js",
+  "name": "gun-huesync",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stefdv/gun-huesync.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "2.0.7"
+}
