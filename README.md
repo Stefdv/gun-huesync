@@ -22,7 +22,7 @@ I have a fork of hue-simulator here https://github.com/Stefdv/hueSimulator
  npm install Stefdv/hue-simulator
 ```
 
-## How to use ii
+## How to use it
 
 ```sh
 npm install gun-huesync
@@ -33,10 +33,10 @@ require('gun-huesync');
 ```
 This will add 
 
-`gun.hue()` takes an object with the IP of the bridge and your private key. To find the bridge and get an API key, read [this great guide](http://www.developers.meethue.com/documentation/getting-started).
+`gun.huesync()` takes an object with the IP of the bridge and your private key. To find the bridge and get an API key, read [this great guide](http://www.developers.meethue.com/documentation/getting-started).
 
 ```javascript
-gun.hue({
+gun.huesync({
   domain: '192.168.1.337',
   key: 'HfBwAl0gNPUQnmqCaxZCcNfd',
 })
@@ -77,9 +77,12 @@ groups.each(nr => {
 
 // Listen for changes to a lights' brightness
 
-
 // Change the brightness
 lights.get(5).get('state').get('bri').put(42)
+```
+or if you loaded `path.js`
+```
+lights.path('5.state.bri').put(42)
 ```
 
 But i probably will include methods for this later on
@@ -88,7 +91,8 @@ But i probably will include methods for this later on
 Provide examples 
 
 ## Warning
-If you change the state of the lights through something other than gun after it's already connected, the state won't sync. This is because this library doesn't poll the rest service.
+If you change the state of the lights through something other than gun after it's already connected, the state won't sync. This is because this library doesn't poll the rest service. 
+However...if you manage to link your Hue app to the server where gun-huesync is running...well... gun-huesync will send all requests to the bridge anyway, but it will also update your Gun data.
 
 
 ## Support
