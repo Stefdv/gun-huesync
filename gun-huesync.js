@@ -4,80 +4,64 @@
  * - loads the fullstate from the Bridge and puts it in Gun (soul:'HUE')
  * - Acts on any change that will be made on this Data
  * - Sends these changes to the Bridge.
- *
- *
+ * 
 
- *
- * in node just do :
- * ```
+ * ```sh
  *  gun.hue({
  *  	domain:'my_bridge_ip:port_if_not_port_80',
  *  	key: 'authorisation_key'
  *  })
  * ```
- * NOTE: 
- * You should use gun-huesync on the server only!!
-
  * @author  S.J.J. de Vries ( Stefdv2@hotmail.com)
  * @gitter @Stefdv
  * @purpose sync Philips Hue Bridge settings with Gun
  *
  */
 ;(function(){
-  if(typeof window !== "undefined"){
-    console.warn('gun-huesync should be loaded on your Gun-server!\n' + 
-   	' Then from your -connected- application you can access gun.get("HUE") ')
-
-  } else {
-    var Gun = require('gun/gun');
-    require('gun/lib/path.js');
-    var axios = require('axios');
-	/*
-  		when gun-husync loads, it will fetch the fullState
-  		from the bridge and put it in Gun.
-  		'_listen'  will prevent the callback from executing
-  		during this process.
-   */
+  var Gun = require('gun/gun');
+  require('gun/lib/path.js');
+  var axios = require('axios');
+	/**
+	 * 	when gun-husync loads, it will fetch the fullState
+	 *  from the bridge and put it in Gun.
+	 *  '_listen'  will prevent the callback from executing
+	 *  during this process.
+	 */
 	var _listen = false; 
-	/*
-			Some fields in the Hue Bridge JSON are arrays
-			that we convert to Objects.
-			'convertBack' will hold the paths to those fields
-			so we can compare them on changes and convert them
-		  back to an array before sending it to the bridge again.
-	 */ 
+
+	/**
+	 * Some fields in the Hue Bridge JSON are arrays
+	 * that we convert to Objects.
+	 * 'convertBack' will hold the paths to those fields
+	 * so we can compare them on changes and convert them
+	 * back to an array before sending it to the bridge again.
+	 */
 	var convertBack = {};
 
 	/**
- * Generate a url to the hue API root,
- * optionally taking an array of routes.
- *
- * @private
- * @param  {String} domain - the ip/domain name of the hue bridge
- * @param  {String} key - your private authentication key
- * @param  {Array} [path] - a list of routes to append to the url
- * @returns {String} - the fully formatted url
- */
-function hueURL (domain, key, path) {
-	return ([ 'http:/', domain, 'api', key ])
-		.concat(path || [])
-		.join('/');
-};
+	 * Generate a url to the hue API root,
+	 * optionally taking an array of routes.
+	 */
+	function hueURL (domain, key, path) {
+		return ([ 'http:/', domain, 'api', key ])
+			.concat(path || [])
+			.join('/');
+	};
 
 	/**
 	 * Adapted from @amark's "_onward" plugin, 
-	 * but modified for HUE!
+	 * slightly modified for HUE!
 	 * Listens for changes at any depth, and provides a path to them.
 	 *
 	 * @author Mark Nadal
 	 * @see https://github.com/gundb/_onward
 	 *
-	 * There is a bug where onward fires twice, the first time it 
-	 * will only contain the actual change ( { bri:200}) but the 
-	 * second time it contains the whole object.
+	 * Unlike the '.open()' module, '.onward()' will only
+	 * give you the actual changed property.
 	 * 
-	 * Just make sure you put your data with full path
-	 * `Gun.HUE.path('lights.1.state.bri').put(200)` // GOOD fires once
+	 * That is...IF you are very strict in how you put something in Gun.
+	 * eg:
+	 * `Gun.HUE.path('lights.1.state.bri').put(200)`    // GOOD fires once
 	 * `Gun.HUE.path('lights.1.state').put({bri:200})`  // BAD fires twice
 	 */
 
@@ -135,8 +119,6 @@ function _onward(gun,cb, opt) {
  *   key: 'ZaJV5zCgoH5cBsbKtDZmFLbg',
  * })
  * 
- *
- * 
  */
 function huesync(auth) {
 	if(typeof auth.domain !=='string') { console.warn('Hue IP address required.')}
@@ -171,15 +153,15 @@ function huesync(auth) {
 /*
 	TODO:
 	There is still a problem when setting lights on groups.
-	`gun.get('HUE').path('groups.1.lights').put({0:1,1:6})` does work but fires twice
-	`gun.get('HUE').path('groups.1.lights').put({0:1,1:2,2:3,3:4})`
-	`gun.get('HUE').path('groups.1.lights').put({0:1})` fails
-	So i need to 
-	- first get the object back from Gun {0:1,1:6}
-	- then store it as `gun.get('HUE').path('groups.1.lights.0').put(1)`
+	Because Gun does not like Arrays we have to convert them back and forth.
+	'groups.1.lights' is an Array and therefore it is converted to an Object
+
+	`gun.get('HUE').path('groups.1.lights').put({0:1,1:6})`   			// does work but fires twice
+	`gun.get('HUE').path('groups.1.lights').put({0:1,1:2,2:3,3:4})` // does work but fires twice
+	`gun.get('HUE').path('groups.1.lights').put({0:1})` 						// fails because 1:6 still exists
 
 	@method _submitToBridge
-	compare the path with convetBack
+	compare the path with convertBack
 	if the path exists there we need to convert it back to an array
 	send a PUT request to the bridge
  */
@@ -193,11 +175,7 @@ function _submitToBridge(auth,path,change){
 	console.log('PUT ',changeURL,  Gun.text.ify(body))
 	axios
 		.put(changeURL,Gun.text.ify(body))
-		
 }
-
-
-
 
 /**
 	* Send GET request to bridge for the fullstate.
@@ -288,5 +266,5 @@ function _objToArr(o) {
 	}
 
 Gun.chain.huesync = huesync;
-};
+
 }());
