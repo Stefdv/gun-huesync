@@ -1,5 +1,23 @@
 /**
  * gun-huesync
+ * An interface between your Philips HUE Bridge and Gundb
+ * - loads the fullstate from the Bridge and puts it in Gun (soul:'HUE')
+ * - Acts on any change that will be made on this Data
+ * - Sends these changes to the Bridge.
+ *
+ *
+
+ *
+ * in node just do :
+ * ```
+ *  gun.hue({
+ *  	domain:'my_bridge_ip:port_if_not_port_80',
+ *  	key: 'authorisation_key'
+ *  })
+ * ```
+ * NOTE: 
+ * You should use gun-huesync on the server only!!
+
  * @author  S.J.J. de Vries ( Stefdv2@hotmail.com)
  * @gitter @Stefdv
  * @purpose sync Philips Hue Bridge settings with Gun
@@ -7,12 +25,13 @@
  */
 ;(function(){
   if(typeof window !== "undefined"){
-    var Gun = window.Gun;
+    console.warn('gun-huesync should be loaded on your Gun-server!\n' + 
+   	' Then from your -connected- application you can access gun.get("HUE") ')
+
   } else {
     var Gun = require('gun/gun');
     require('gun/lib/path.js');
     var axios = require('axios');
-  }
 	/*
   		when gun-husync loads, it will fetch the fullState
   		from the bridge and put it in Gun.
@@ -22,12 +41,13 @@
 	var _listen = false; 
 	/*
 			Some fields in the Hue Bridge JSON are arrays
-			that are converted to Objects.
+			that we convert to Objects.
 			'convertBack' will hold the paths to those fields
 			so we can compare them on changes and convert them
 		  back to an array before sending it to the bridge again.
 	 */ 
 	var convertBack = {};
+
 	/**
  * Generate a url to the hue API root,
  * optionally taking an array of routes.
@@ -44,15 +64,13 @@ function hueURL (domain, key, path) {
 		.join('/');
 };
 
-
-
 	/**
-	 * Adapted from @amark's "hue_onward" plugin, 
+	 * Adapted from @amark's "_onward" plugin, 
 	 * but modified for HUE!
 	 * Listens for changes at any depth, and provides a path to them.
 	 *
 	 * @author Mark Nadal
-	 * @see https://github.com/gundb/hue_onward
+	 * @see https://github.com/gundb/_onward
 	 *
 	 * There is a bug where onward fires twice, the first time it 
 	 * will only contain the actual change ( { bri:200}) but the 
@@ -63,9 +81,7 @@ function hueURL (domain, key, path) {
 	 * `Gun.HUE.path('lights.1.state').put({bri:200})`  // BAD fires twice
 	 */
 
-	Gun.chain.hue_onward= function (cb, opt) {
-		  var gun = this;
-
+function _onward(gun,cb, opt) {
 	    cb = cb || function(){};
 		  opt = (opt === true ? {full: true} : opt || {});
 
@@ -88,10 +104,8 @@ function hueURL (domain, key, path) {
 			          if(opt.ctx[objectID]){ return } 	// do not re-subscribe.
 			          opt.ctx[objectID] = true; 				// unique subscribe!
 			        	if(field !== '_' && field!=='>') { // no need to subscribe to those
-			        		//console.log('subscribe to ', o.path.join('.') + '.' + field)
-			          	this.get(field).hue_onward(cb,o) // subscribe to this path
+			          	_onward(this.get(field),cb,o) // subscribe to this path
 			        	}
-
 			          return;
 			        }
 			      }, gun);
@@ -104,25 +118,19 @@ function hueURL (domain, key, path) {
 		    return gun;
 	};
 
-
-
-
-
-
 /**
  * Reads the state of hue and imports it into your
  * gun instance, while listening for changes and
- * sending back to the bridge.
+ * sending those back to the bridge.
  *
- * @method hue
+ * @method huesync
  * @param {Object} auth - your authentication information
  * @param {String} auth.domain - your hue bridge IP address
  * @param {String} auth.key - your hue API key
  * @returns {Promise} - the web request for your hue state
  * @example
- * let gun = new Gun().get('hue')
  *
- * gun.hue({
+ * gun.huesync({
  *   domain: '192.168.1.150',
  *   key: 'ZaJV5zCgoH5cBsbKtDZmFLbg',
  * })
@@ -130,17 +138,15 @@ function hueURL (domain, key, path) {
  *
  * 
  */
-function subscribe(auth) {
-console.log(auth)
+function huesync(auth) {
 	if(typeof auth.domain !=='string') { console.warn('Hue IP address required.')}
 	if(typeof auth.key !=='string') { console.warn('Authentication key required.')}
 	let gun = this;
 	let rootURL = hueURL(auth.domain, auth.key);
 	Gun.HUE = gun.get('HUE');
-	gun.get('HUE').hue_onward( (change, path) => {
-
-
-		if(_listen) {// The first run i don't want to do anything
+	
+	_onward(Gun.HUE,(change, path) => {
+		if(_listen) {
 	   console.log('received change')
 	    if(change instanceof Object) {
 	    	change = Gun.obj.copy(change)
@@ -149,10 +155,11 @@ console.log(auth)
 	    if(!change['#']){ 
 	    	let str = path.indexOf("HUE")
 	      if(str != -1) {
-	      	// the path contains 'HUE', we don't want need that.
+	      	// the path contains 'HUE', we don't need that.
 	        path.splice(str, 1);
 	      }
 	     	let changeURL = hueURL(auth.domain, auth.key, path);
+
 	      _submitToBridge(auth,path,change);
 	    }
 	 } 
@@ -169,112 +176,117 @@ console.log(auth)
 	`gun.get('HUE').path('groups.1.lights').put({0:1})` fails
 	So i need to 
 	- first get the object back from Gun {0:1,1:6}
-	- then store it as ``gun.get('HUE').path('groups.1.lights.0').put(1)`
+	- then store it as `gun.get('HUE').path('groups.1.lights.0').put(1)`
+
+	@method _submitToBridge
+	compare the path with convetBack
+	if the path exists there we need to convert it back to an array
+	send a PUT request to the bridge
  */
 function _submitToBridge(auth,path,change){
-	function ObjToArray(obj) {
-		obj = Gun.obj.copy(obj)
-		delete obj._
-		return Object.values(obj);
-	}
-	let changeURL;
-	//console.log(convertBack)
-	//console.log(path.join('.'))
-	if(convertBack[path.join('.')]) {
-		// remove last from changeUrl
-		let key = path.pop(); // will remove last from path also !
-		// convert change back to Array.
-		let val = ObjToArray(change);
-		// reset change
-		change = {};
-		// create new change
-		change[key] = val
-	}
+	let changeURL,body={},key;
+	console.log(convertBack[path.join('.')],change)
+	change = convertBack[path.join('.')] ? _objToArr(change) : change;
+	key = path.pop();
+	body[key] = change;
 	changeURL = hueURL(auth.domain, auth.key, path);
-	console.log('PUT ',changeURL,  Gun.text.ify(change))
-	axios.put(changeURL,Gun.text.ify(change))
-	
+	console.log('PUT ',changeURL,  Gun.text.ify(body))
+	axios
+		.put(changeURL,Gun.text.ify(body))
+		
 }
+
+
 
 
 /**
 	* Send GET request to bridge for the fullstate.
-	* Run the response to 'gunalize' to convert Arrays to Objects
+	* Run the response thru '_prepareForGun' to convert Arrays to Objects
 	* Put the fullstate in gun (gun.get('HUE'))
 	*/
 function _fullStateToGun(rootURL,gun) {
-	console.log('_fullStateToGun')
-
-
+	console.log('Trying to connect to HUE Bridge @ : "%s" ',rootURL)
 	axios
 		.get(rootURL)
 		.then(function (response) {
-			/** Put the data into the gun instance*/
-			let d = _gunalize(response.data);
-			_processToGun(d);
-		});
+			console.log('Connected...Fetching FullState')
+
+			_saveToGun(_prepareForGun(response.data));
+		}).catch(function (error) {
+    	console.log('Could NOT connect to HUE bridge! Please check your domain and key');
+  	});
 }
 
 /**
  * Hue bridge returns a JSON with some Array fields
  * Gun doesn't validate Arrays so we need to convert those 
  * to Objects.
- * NOTE: remember that you will have to transform them back to arrays
+ * NOTE: we use 'convertBack' to remember which paths we need to transform back to arrays
  * before sending the commands back to the bridge!!
  */
 
-function _gunalize(obj) {
-  // convert Array to Object 
-  let _arrayToObject = (arr) =>{
-	  let rv = {};
-	  let i;
-	  for (i = 0; i < arr.length; ++i){
-	    rv[i] = arr[i];
-	  }
-	  return rv;
-  };
-  let path=[]
-  // iterate (deep) over the JSON Object and convert every Array to an Object
-  var _iterate = function(obj,stack) {
+function _prepareForGun(obj) {
+	console.log('converting Arrays to Objects')
+  let _iterate = function(o,s) {
 
-		for(var prop in obj) {
-	  	if(obj.hasOwnProperty(prop)) {
-	  		if(Array.isArray(obj[prop])){
-	  			convertBack[stack + '.' + prop] = true;
-	  			obj[prop] = _arrayToObject(obj[prop])
-	  		} else if(typeof obj[prop] == "object") {
-	    		stack ? _iterate(obj[prop], stack + '.' + prop) : _iterate(obj[prop],prop);
+		for(var p in o) {
+	  	if(o.hasOwnProperty(p)) {
+	  		if( Gun.list.is(o[p]) ){
+	  			convertBack[s + '.' + p] = true;
+	  			console.log('...',s + '.' + p)
+	  			o[p] = _arrToObj(o[p]);
+	  		} else if( Gun.obj.is(o[p]) ) {
+	    		s ? _iterate(o[p], s + '.' + p) : _iterate(o[p],p);
 	      } 
 	    } 
 	  } 
-	  return obj
+	  return o
 	}
-
   // Start the iteration
   return _iterate(obj);
 }
 
-function _processToGun(obj) {
+/**
+ * Store the fullState in Gun
+ * use the paths as keys so we can do
+ * `gun.get('HUE').path('lights.1.state')`
+ */
+function _saveToGun(o) {
+	console.log('Putting FullState into Gun ')
+	let iterate = function(o,s) {
 
-	var iterate = function(obj,stack) {
-		for(var property in obj) {
-	  	if(obj.hasOwnProperty(property)) {
-	    	if(typeof obj[property] == "object") {
-	    		if(!stack) { iterate(obj[property],property);} 
-	    		else { iterate(obj[property], stack + '.' + property);}
+		for(var p in o) {
+	  	if(o.hasOwnProperty(p)) {
+	    	if(Gun.obj.is(o[p])) {
+	    		s ? iterate(o[p], s + '.' + p) : iterate(o[p],p);
 	      } else {
-	       let data = {};
-	       data[property] = obj[property];
-	     //  console.log(`gun.get('HUE').path("${stack}").put(${Gun.text.ify(data)})`)
-	       Gun.HUE.path(stack).put(data);
+	       let d = {};
+	       d[p] = o[p];
+	       //console.log(`gun.get('HUE').path(${s}).put(${Gun.text.ify(d)})`)
+	       Gun.HUE.path(s).put(d);
 	      } 
 	    } 
 	  } 
 	}
-	iterate(obj);
+
+	iterate(o);
 	_listen = true;
+	console.log('Listening for changes that need to be synced to the Hue Bridge')
+
 }
 
-Gun.prototype.hue = subscribe;
+function _arrToObj(a) {
+	 let o = {},i;
+	 for (i = 0; i < a.length; ++i){o[i] = a[i];}
+	 return o;
+}
 
+function _objToArr(o) {
+		o = Gun.obj.copy(o)
+		delete o._
+		return Object.values(o);
+	}
+
+Gun.chain.huesync = huesync;
+};
 }());
